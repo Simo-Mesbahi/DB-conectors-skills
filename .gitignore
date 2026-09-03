@@ -1,0 +1,22 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data / exports générés
+/data/*.db
+/exports/
+*.csv
+*.xlsx
+!examples/**/*.csv
+
+# OS
+.DS_Store
