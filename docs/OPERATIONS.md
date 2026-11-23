@@ -83,3 +83,9 @@ Utiliser un curseur ou un instantané transactionnel si le besoin métier l’im
 et rejet des expressions de tri avant contact du client Supabase. Aucun serveur
 Supabase réel n’est contacté par ces tests. Preuves :
 `verification/2026-11-23-resource-controls/`.
+
+## Data integrity continuation — 2026-11-23
+
+CSV, JSON and XLSX exports serialize into a same-directory temporary file and replace the destination only on success. Serialization errors preserve existing destinations and clean temporary files. Existing file permissions are retained. This is single local-file replacement, not a multi-file/database transaction or power-loss guarantee.
+
+CSV/XLSX default to `safe_cells=True`: potentially executable text and headers receive an apostrophe prefix, while numbers and the original DataFrame remain unchanged. Trusted callers may explicitly choose `safe_cells=False`. JSON preserves strings exactly. Compressed CSV/JSON preserve compression and stable ZIP/tar member names. XLSX requires `pip install -e '.[excel]'`; CI installs `.[dev,excel]`. This does not certify every spreadsheet application. Offline suite: 60 tests passed.
