@@ -16,6 +16,7 @@ from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from queries.identifiers import identifier, pagination
 
 from utils.logger import get_logger
 
@@ -26,9 +27,12 @@ logger = get_logger(__name__)
 # (A) SQL BRUT — via SQLAlchemy (fonctionne pour Postgres/MySQL/SQLite)
 # ------------------------------------------------------------------
 
+
 def select_all(engine: Engine, table: str) -> list[dict[str, Any]]:
     """SELECT * FROM table (à réserver aux petites tables / debug)."""
-    query = text(f"SELECT * FROM {table}")  # nom de table non paramétrable en SQL -> valider en amont si dynamique
+    query = text(
+        f"SELECT * FROM {identifier(engine, table, qualified=True)}"
+    )  # nom de table non paramétrable en SQL -> valider en amont si dynamique
     with engine.connect() as conn:
         result = conn.execute(query)
         rows = [dict(row._mapping) for row in result]
@@ -43,13 +47,13 @@ def select_with_filter(
     SELECT filtré avec requête PARAMÉTRÉE (protection anti-injection SQL).
     Ne JAMAIS faire de f-string avec une valeur utilisateur dans le WHERE.
     """
-    query = text(f"SELECT * FROM {table} WHERE {column} = :value")
+    query = text(
+        f"SELECT * FROM {identifier(engine, table, qualified=True)} WHERE {identifier(engine, column)} = :value"
+    )
     with engine.connect() as conn:
         result = conn.execute(query, {"value": value})
         rows = [dict(row._mapping) for row in result]
-    logger.info(
-        "select_with_filter('%s', %s=%s) -> %s lignes.", table, column, value, len(rows)
-    )
+    logger.info("select_with_filter(%s): column=%s, rows=%s", table, column, len(rows))
     return rows
 
 
@@ -79,8 +83,12 @@ def select_with_join(engine: Engine) -> list[dict[str, Any]]:
     return rows
 
 
-def select_aggregation(engine: Engine, table: str, group_by_column: str) -> list[dict[str, Any]]:
+def select_aggregation(
+    engine: Engine, table: str, group_by_column: str
+) -> list[dict[str, Any]]:
     """Exemple d'agrégation : compte + moyenne, groupés par colonne."""
+    table = identifier(engine, table, qualified=True)
+    group_by_column = identifier(engine, group_by_column)
     query = text(
         f"""
         SELECT
@@ -98,10 +106,19 @@ def select_aggregation(engine: Engine, table: str, group_by_column: str) -> list
     return rows
 
 
-def select_paginated(engine: Engine, table: str, page: int = 1, page_size: int = 50) -> list[dict[str, Any]]:
+def select_paginated(
+    engine: Engine,
+    table: str,
+    page: int = 1,
+    page_size: int = 50,
+    *,
+    order_by: str = "id",
+) -> list[dict[str, Any]]:
     """Pagination simple avec OFFSET/LIMIT — utile pour gros volumes de données."""
-    offset = (page - 1) * page_size
-    query = text(f"SELECT * FROM {table} LIMIT :limit OFFSET :offset")
+    offset = pagination(page, page_size)
+    query = text(
+        f"SELECT * FROM {identifier(engine, table, qualified=True)} ORDER BY {identifier(engine, order_by)} LIMIT :limit OFFSET :offset"
+    )
     with engine.connect() as conn:
         result = conn.execute(query, {"limit": page_size, "offset": offset})
         rows = [dict(row._mapping) for row in result]
@@ -113,6 +130,7 @@ def select_paginated(engine: Engine, table: str, page: int = 1, page_size: int =
 # (B) CLIENT SUPABASE — via l'API REST auto-générée (PostgREST)
 # ------------------------------------------------------------------
 
+
 def supabase_select_all(client, table: str) -> list[dict[str, Any]]:
     """Équivalent select_all() mais via le SDK Supabase (API REST)."""
     response = client.table(table).select("*").execute()
@@ -120,20 +138,55 @@ def supabase_select_all(client, table: str) -> list[dict[str, Any]]:
     return response.data
 
 
-def supabase_select_with_filter(client, table: str, column: str, value: Any) -> list[dict[str, Any]]:
+def supabase_select_with_filter(
+    client, table: str, column: str, value: Any
+) -> list[dict[str, Any]]:
     """Équivalent select_with_filter() via le SDK Supabase."""
     response = client.table(table).select("*").eq(column, value).execute()
     logger.info(
-        "supabase_select_with_filter('%s', %s=%s) -> %s lignes.",
-        table, column, value, len(response.data),
+        "supabase_select_with_filter(%s): column=%s, rows=%s",
+        table,
+        column,
+        len(response.data),
     )
     return response.data
 
 
-def supabase_select_paginated(client, table: str, page: int = 1, page_size: int = 50) -> list[dict[str, Any]]:
+def supabase_select_paginated(
+    client, table: str, page: int = 1, page_size: int = 50
+) -> list[dict[str, Any]]:
     """Pagination via .range() du SDK Supabase."""
-    start = (page - 1) * page_size
+    start = pagination(page, page_size)
     end = start + page_size - 1
     response = client.table(table).select("*").range(start, end).execute()
-    logger.info("supabase_select_paginated('%s', page=%s) -> %s lignes.", table, page, len(response.data))
+    logger.info(
+        "supabase_select_paginated('%s', page=%s) -> %s lignes.",
+        table,
+        page,
+        len(response.data),
+    )
     return response.data
+
+
+def select_after_id(
+    engine: Engine,
+    table: str,
+    after_id: int = 0,
+    page_size: int = 100,
+    *,
+    id_column: str = "id",
+) -> list[dict[str, Any]]:
+    """Indexed keyset pagination. id_column must be a unique, immutable integer key."""
+    pagination(1, page_size)
+    if type(after_id) is not int:
+        raise ValueError("after_id must be an integer")
+    name = identifier(engine, table, qualified=True)
+    key = identifier(engine, id_column)
+    with engine.connect() as conn:
+        result = conn.execute(
+            text(
+                f"SELECT * FROM {name} WHERE {key} > :cursor ORDER BY {key} LIMIT :size"
+            ),
+            {"cursor": after_id, "size": page_size},
+        )
+        return [dict(row._mapping) for row in result]

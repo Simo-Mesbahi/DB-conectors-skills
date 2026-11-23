@@ -56,7 +56,8 @@ def test_dataframe_to_records_roundtrip(sample_df):
 def test_drop_duplicates_and_nulls(sample_df):
     df_with_dup = pd.concat([sample_df, sample_df.iloc[[0]]], ignore_index=True)
     cleaned = drop_duplicates_and_nulls(df_with_dup)
-    assert len(cleaned) == len(sample_df)
+    assert len(cleaned) == 3
+    assert cleaned["product"].tolist() == ["A", "B", "C"]
 
 
 def test_rename_columns(sample_df):
