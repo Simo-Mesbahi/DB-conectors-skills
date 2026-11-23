@@ -17,10 +17,6 @@ from typing import Literal
 
 from sqlalchemy.engine import Engine
 
-from db_connection.postgresql_connector import get_pg_engine
-from db_connection.mysql_connector import get_mysql_engine
-from db_connection.sqlite_connector import get_sqlite_engine
-from db_connection.supabase_connector import get_supabase_sql_engine
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -28,10 +24,10 @@ logger = get_logger(__name__)
 DBType = Literal["postgresql", "mysql", "sqlite", "supabase"]
 
 _ENGINE_FACTORIES = {
-    "postgresql": get_pg_engine,
-    "mysql": get_mysql_engine,
-    "sqlite": get_sqlite_engine,
-    "supabase": get_supabase_sql_engine,
+    "postgresql": ("db_connection.postgresql_connector", "get_pg_engine"),
+    "mysql": ("db_connection.mysql_connector", "get_mysql_engine"),
+    "sqlite": ("db_connection.sqlite_connector", "get_sqlite_engine"),
+    "supabase": ("db_connection.supabase_connector", "get_supabase_sql_engine"),
 }
 
 
@@ -52,7 +48,9 @@ def get_engine(db_type: DBType) -> Engine:
             f"Valeurs acceptées : {list(_ENGINE_FACTORIES.keys())}"
         )
     logger.info("Création du moteur de connexion pour : %s", db_type)
-    return factory()
+    from importlib import import_module
+    module, function = factory
+    return getattr(import_module(module), function)()
 
 
 class DatabaseSession:

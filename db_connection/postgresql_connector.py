@@ -15,7 +15,7 @@ import time
 import psycopg2
 from psycopg2.extensions import connection as PGConnection
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Engine, URL
 
 from utils.env_loader import PostgresConfig
 from utils.logger import get_logger
@@ -65,7 +65,7 @@ def get_pg_engine(pool_size: int = 5, max_overflow: int = 10) -> Engine:
     Recommandé pour un usage combiné avec pandas (pd.read_sql).
     """
     config = PostgresConfig()
-    url = f"postgresql+psycopg2://{config.user}:{config.password}@{config.host}:{config.port}/{config.db}"
+    url = URL.create("postgresql+psycopg2", username=config.user, password=config.password, host=config.host, port=int(config.port), database=config.db)
 
     try:
         engine = create_engine(

@@ -14,7 +14,9 @@ Deux façons de se connecter à Supabase, chacune avec son cas d'usage :
 
 from __future__ import annotations
 
-from supabase import create_client, Client
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from supabase import Client
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
@@ -32,6 +34,7 @@ def get_supabase_client() -> Client:
         client = get_supabase_client()
         response = client.table("users").select("*").execute()
     """
+    from supabase import create_client
     config = SupabaseConfig()
     try:
         client = create_client(config.url, config.key)
@@ -51,7 +54,7 @@ def get_supabase_sql_engine(pool_size: int = 5, max_overflow: int = 10) -> Engin
         pool_size: nombre de connexions maintenues dans le pool.
         max_overflow: connexions supplémentaires autorisées en pic de charge.
     """
-    config = SupabaseConfig()
+    config = SupabaseConfig(sql=True)
     try:
         engine = create_engine(
             config.db_url,

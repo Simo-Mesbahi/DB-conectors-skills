@@ -41,10 +41,10 @@ def get_env(key: str, required: bool = True, default: str | None = None) -> str 
 class SupabaseConfig:
     """Regroupe la config Supabase pour éviter de répéter get_env() partout."""
 
-    def __init__(self) -> None:
-        self.url: str = get_env("SUPABASE_URL")
-        self.key: str = get_env("SUPABASE_KEY")
-        self.db_url: str = get_env("SUPABASE_DB_URL")
+    def __init__(self, *, sql: bool = False) -> None:
+        self.url: str | None = get_env("SUPABASE_URL", required=not sql)
+        self.key: str | None = get_env("SUPABASE_KEY", required=not sql)
+        self.db_url: str | None = get_env("SUPABASE_DB_URL", required=sql)
 
 
 class PostgresConfig:

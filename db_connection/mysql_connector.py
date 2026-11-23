@@ -14,7 +14,7 @@ import time
 import mysql.connector
 from mysql.connector.connection import MySQLConnection
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Engine, URL
 
 from utils.env_loader import MySQLConfig
 from utils.logger import get_logger
@@ -58,7 +58,7 @@ def get_mysql_engine(pool_size: int = 5, max_overflow: int = 10) -> Engine:
     Moteur SQLAlchemy pour MySQL (driver PyMySQL), avec pool de connexions.
     """
     config = MySQLConfig()
-    url = f"mysql+pymysql://{config.user}:{config.password}@{config.host}:{config.port}/{config.db}"
+    url = URL.create("mysql+pymysql", username=config.user, password=config.password, host=config.host, port=int(config.port), database=config.db)
 
     try:
         engine = create_engine(
