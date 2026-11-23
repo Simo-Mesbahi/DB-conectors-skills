@@ -33,3 +33,34 @@ Une commande réserve le stock par UPDATE conditionnel atomique, sans SELECT FOR
 37 tests passent localement avec Python 3.12, pandas et SQLAlchemy. Ils couvrent les identifiants malveillants, les valeurs paramétrées, les limites de pagination, le rollback entre lots et quatre achats concurrents pour une seule unité de stock. La wheel a été construite.
 
 Les connexions vers des serveurs PostgreSQL/MySQL/Supabase réels n’ont pas été exécutées : configurer leurs accès, qualifier les schémas, contraintes, niveaux d’isolation, TLS et délais dans un environnement de test dédié avant une mise en production.
+
+## Lecture SQL progressive
+
+`iter_rows` permet de parcourir une table sans construire une liste de toutes ses
+lignes dans le code appelant. `batch_size` est un entier de 1 à 1 000 et `order_by`
+doit être une clé unique. Les identifiants sont validés et cités comme dans les
+autres fonctions SQL.
+
+```python
+from contextlib import closing
+from queries.select_queries import iter_rows
+
+with closing(iter_rows(engine, "items", batch_size=500, order_by="id")) as rows:
+    for row in rows:
+        process(row)
+        if should_stop():
+            break
+```
+
+L'itérateur conserve une connexion jusqu'à son épuisement ou sa fermeture. Le bloc
+`closing` la libère également lors d'un arrêt anticipé ou d'une exception du consommateur.
+Ne pas transformer immédiatement l'itérateur en liste pour un gros volume.
+
+SQLAlchemy reçoit `yield_per`, qui active le curseur serveur lorsque le pilote le
+permet. Certains pilotes peuvent encore mettre leurs résultats en mémoire ; une
+limite globale de mémoire n'est pas garantie pour chaque combinaison de pilote et
+serveur. Les changements concurrents restent soumis au niveau d'isolation de la base.
+
+Vérification locale : **43 tests** au total, dont lecture ordonnée sur plusieurs lots,
+libération de connexion après exception et refus des limites ou identifiants invalides.
+PostgreSQL et MySQL distants n'ont pas été contactés dans cette vérification.
