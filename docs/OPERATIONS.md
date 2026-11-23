@@ -64,3 +64,22 @@ serveur. Les changements concurrents restent soumis au niveau d'isolation de la 
 Vérification locale : **43 tests** au total, dont lecture ordonnée sur plusieurs lots,
 libération de connexion après exception et refus des limites ou identifiants invalides.
 PostgreSQL et MySQL distants n'ont pas été contactés dans cette vérification.
+
+## Filtres nuls et ordre des pages
+
+`select_with_filter`, `update_rows` et `delete_rows` interprètent désormais une
+valeur de filtre Python `None` comme `IS NULL`. Les valeurs non nulles restent des
+paramètres liés et les identifiants sont toujours validés et cités. Ce changement
+remplace le précédent `= NULL`, qui ne sélectionnait aucune ligne. Un filtre nul
+peut donc modifier ou supprimer toutes les lignes dont la colonne est nulle.
+
+`supabase_select_paginated(..., order_by="id")` ajoute un tri explicite avant
+`.range()`. Un autre identifiant simple est accepté ; la colonne choisie doit
+permettre un ordre unique et stable. Cette pagination ne garantit pas un instantané
+entre plusieurs appels ni l’absence de décalage sous des écritures concurrentes.
+Utiliser un curseur ou un instantané transactionnel si le besoin métier l’impose.
+
+**50 tests locaux réussis**, dont sélectivité des filtres nuls, valeurs hostiles liées
+et rejet des expressions de tri avant contact du client Supabase. Aucun serveur
+Supabase réel n’est contacté par ces tests. Preuves :
+`verification/2026-11-23-resource-controls/`.

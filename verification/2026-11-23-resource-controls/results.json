@@ -1,0 +1,13 @@
+{
+  "date_utc": "2026-11-23T16:14:19.486584+00:00",
+  "base_commit": "ef52189136bec14da619634d76b7c0680494ac3b",
+  "execution": "local; external integrations not exercised",
+  "checks": [
+    {
+      "command": "python -m pytest -q",
+      "exit_code": 0,
+      "log": "check-1.log"
+    }
+  ],
+  "passed": true
+}
