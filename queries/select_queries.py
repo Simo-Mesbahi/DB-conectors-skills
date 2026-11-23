@@ -13,6 +13,7 @@ La transformation en DataFrame/exploitation se fait dans data_processing/.
 from __future__ import annotations
 
 from typing import Any
+from collections.abc import Iterator
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -124,6 +125,31 @@ def select_paginated(
         rows = [dict(row._mapping) for row in result]
     logger.info("select_paginated('%s', page=%s) -> %s lignes.", table, page, len(rows))
     return rows
+
+
+def iter_rows(
+    engine: Engine,
+    table: str,
+    *,
+    batch_size: int = 1000,
+    order_by: str = "id",
+) -> Iterator[dict[str, Any]]:
+    """Read ordered rows in batches, keeping one connection until closed.
+
+    Use a unique ordering key. Drivers supporting server-side cursors receive
+    yield_per; other drivers may still buffer internally. Close an unfinished
+    iterator explicitly (for example with contextlib.closing).
+    """
+    pagination(1, batch_size)
+    statement = text(
+        f"SELECT * FROM {identifier(engine, table, qualified=True)} "
+        f"ORDER BY {identifier(engine, order_by)}"
+    )
+    with engine.connect().execution_options(yield_per=batch_size) as connection:
+        with connection.execute(statement) as result:
+            for partition in result.mappings().partitions(batch_size):
+                for row in partition:
+                    yield dict(row)
 
 
 # ------------------------------------------------------------------
