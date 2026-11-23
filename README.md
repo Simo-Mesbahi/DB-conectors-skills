@@ -145,3 +145,10 @@ une pull request.
 
 *Ce repo a vocation pédagogique : il montre les bonnes pratiques (sécurité,
 gestion d'erreurs, structuration du code) autant que la technique elle-même.*
+
+
+## Version 1.1 — contrats sûrs et traitements bornés
+
+Installation légère : `python -m pip install -e '.[dev]'`, puis `python -m pytest -q`. Les pilotes distants sont optionnels et chargés uniquement lorsqu’ils sont demandés.
+
+Identifiants SQL validés/cités, pagination par clé, insertion itérable par lots, contrôle des montants et transactions de stock atomiques. [Guide d’exploitation et périmètre de vérification](docs/OPERATIONS.md).
