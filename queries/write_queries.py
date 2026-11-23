@@ -12,8 +12,8 @@ from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-from queries.identifiers import identifier
 
+from queries.identifiers import identifier
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -62,9 +62,14 @@ def update_rows(
     where_column = identifier(engine, where_column)
     set_clause = ", ".join(f"{identifier(engine, col)} = :set_{col}" for col in updates)
     params = {f"set_{col}": val for col, val in updates.items()}
-    params["where_value"] = where_value
-
-    query = text(f"UPDATE {table} SET {set_clause} WHERE {where_column} = :where_value")
+    if where_value is not None:
+        params["where_value"] = where_value
+    predicate = (
+        f"{where_column} IS NULL"
+        if where_value is None
+        else f"{where_column} = :where_value"
+    )
+    query = text(f"UPDATE {table} SET {set_clause} WHERE {predicate}")
 
     with engine.begin() as conn:
         result = conn.execute(query, params)
@@ -76,10 +81,15 @@ def delete_rows(engine: Engine, table: str, where_column: str, where_value: Any)
     """Supprime les lignes correspondant au filtre. Retourne le nombre de lignes supprimées."""
     table = identifier(engine, table, qualified=True)
     where_column = identifier(engine, where_column)
-    query = text(f"DELETE FROM {table} WHERE {where_column} = :value")
+    predicate = (
+        f"{where_column} IS NULL" if where_value is None else f"{where_column} = :value"
+    )
+    query = text(f"DELETE FROM {table} WHERE {predicate}")
 
     with engine.begin() as conn:
-        result = conn.execute(query, {"value": where_value})
+        result = conn.execute(
+            query, {} if where_value is None else {"value": where_value}
+        )
     logger.info("delete_rows('%s') -> %s lignes supprimées.", table, result.rowcount)
     return result.rowcount
 

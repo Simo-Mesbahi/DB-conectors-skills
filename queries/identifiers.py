@@ -22,3 +22,10 @@ def pagination(page: int, page_size: int) -> int:
     if type(page_size) is not int or not 1 <= page_size <= 1000:
         raise ValueError("page_size must be between 1 and 1000")
     return (page - 1) * page_size
+
+
+def simple_identifier(name: str) -> str:
+    """Validate a single identifier for APIs that perform their own quoting."""
+    if not isinstance(name, str) or not _IDENTIFIER.fullmatch(name):
+        raise ValueError("Expected a simple identifier, not an expression")
+    return name

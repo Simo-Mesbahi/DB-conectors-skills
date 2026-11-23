@@ -12,13 +12,13 @@ La transformation en DataFrame/exploitation se fait dans data_processing/.
 
 from __future__ import annotations
 
-from typing import Any
 from collections.abc import Iterator
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-from queries.identifiers import identifier, pagination
 
+from queries.identifiers import identifier, pagination, simple_identifier
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -48,11 +48,13 @@ def select_with_filter(
     SELECT filtré avec requête PARAMÉTRÉE (protection anti-injection SQL).
     Ne JAMAIS faire de f-string avec une valeur utilisateur dans le WHERE.
     """
+    column = identifier(engine, column)
+    predicate = f"{column} IS NULL" if value is None else f"{column} = :value"
     query = text(
-        f"SELECT * FROM {identifier(engine, table, qualified=True)} WHERE {identifier(engine, column)} = :value"
+        f"SELECT * FROM {identifier(engine, table, qualified=True)} WHERE {predicate}"
     )
     with engine.connect() as conn:
-        result = conn.execute(query, {"value": value})
+        result = conn.execute(query, {} if value is None else {"value": value})
         rows = [dict(row._mapping) for row in result]
     logger.info("select_with_filter(%s): column=%s, rows=%s", table, column, len(rows))
     return rows
@@ -179,12 +181,13 @@ def supabase_select_with_filter(
 
 
 def supabase_select_paginated(
-    client, table: str, page: int = 1, page_size: int = 50
+    client, table: str, page: int = 1, page_size: int = 50, *, order_by: str = "id"
 ) -> list[dict[str, Any]]:
     """Pagination via .range() du SDK Supabase."""
     start = pagination(page, page_size)
     end = start + page_size - 1
-    response = client.table(table).select("*").range(start, end).execute()
+    key = simple_identifier(order_by)
+    response = client.table(table).select("*").order(key).range(start, end).execute()
     logger.info(
         "supabase_select_paginated('%s', page=%s) -> %s lignes.",
         table,
